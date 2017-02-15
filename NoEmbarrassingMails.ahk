@@ -29,7 +29,7 @@
 SetBatchLines, -1
 ListLines, Off
 
-if (A_AhkVersion < "1.1.24.00") {
+if (A_AhkVersion < "1.1.23.00") {
     MsgBox, This script is not tested with your AutoHotkey version (%A_AhkVersion%).
 	return
 }
