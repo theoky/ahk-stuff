@@ -99,7 +99,15 @@ WatchForEmail:
 					
 				Loop, % ol.ActiveInspector.CurrentItem.Recipients.Count
 				{
-					address := ol.ActiveInspector.CurrentItem.Recipients(A_Index).Address
+					rec := ol.ActiveInspector.CurrentItem.Recipients(A_Index)
+					exchangeUser := rec.AddressEntry.GetExchangeUser()
+					address := ""
+					if (exchangeUser) {
+						address := exchangeUser.PrimarySMTPAddress 
+					} else {
+						address := rec.Address
+					}
+						
 					if (not isInternalMail(address))
 					{
 						warning := true
