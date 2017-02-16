@@ -8,20 +8,24 @@
      v0.0 initial version
 	 v0.1 better adapt to changes in recipients during window in focus,
 		  better customisation
+	 v0.2 offline outlook handling, better focus management
   ----------------------------------------------------------
   Purpose:
 	Check an open e-mail-Window for email recipients outside your company,
-	thus preventing embarassing situationd when you send an email intended for
+	thus preventing embarassing situations when you send an email intended for
 	internal recipients accidentally to external recipients.
 	
 	Currently works only when composing messages and meetings with Outlook and
 	Exchange.
-	
+
+	This script is for those cases when MailTips (since Outlook 2010) are not available
+	or deactivated for the external recipients tip.	
+
   Usage: 
 	* install autohotkey (https://autohotkey.com/)
 	* change MailDomain to your Company Name
 	* Start this script
-	* In case of undesired behaviour -> fix and submit patch ;)
+	* In case of undesired behaviour -> fix it and submit patch ;)
 */
 
 #SingleInstance force
@@ -41,7 +45,12 @@ if (A_AhkVersion < "1.1.23.00") {
 	global GuiPosition           := "Bottom" ; Top or Bottom
 	global FontSize              := 16
 	global GuiHeight             := 50
-	global ExternalWarning		 := "External address!"
+	global warnTextExternal		 := "At least one recipient is external!"
+	global warnTextUnknownAddr	 := "Address lookup failed for at least one recipient - Outlook offline?"
+	
+	global WarningNo		:= 0
+	global WarningExternal	:= 1
+	global WarningUnknown	:= 2
 	
 	global MailDomain			 := "i)/o=Your Company" ; <- customise this
 	#Include *i Customisation.ahk
@@ -68,16 +77,25 @@ isInternalMail(address) {
 
 WatchForEmail:
 
-	warning := false
+	warning := WarningNo
 
-	if (CheckOutlookCom) {
+	if (CheckOutlookCOM) {
 		GroupAdd mail, Message
 		GroupAdd mail, Meeting
 		
-		WinWaitActive, ahk_group mail
+		foundWindow := false
+		while (not foundWindow) {
+			WinWaitActive, ahk_group mail, , %WaitTime%
+			if not ErrorLevel {
+				foundWindow := true
+			} else {
+				HideWarning()
+			}
+		}
+
 		WinGet, outlookWindow, ID, A
-		WinGetTitle, title, A
-		WinGet, pName, ProcessName, A
+		WinGetTitle, title, ahk_id %outlookWindow%
+		WinGet, pName, ProcessName, ahk_id %outlookWindow%
 		WinGetClass, outlookWinClass, ahk_id %outlookWindow%
 		
 		; ahk_class rctrl_renwnd32 for outlook window (not for dialogs)
@@ -94,7 +112,7 @@ WatchForEmail:
 						return
 					}
 				} catch {
-					warning := false
+					warning := WarningNo
 				}
 					
 				Loop, % ol.ActiveInspector.CurrentItem.Recipients.Count
@@ -104,25 +122,32 @@ WatchForEmail:
 					address := ""
 					if (exchangeUser) {
 						address := exchangeUser.PrimarySMTPAddress 
+						if (not address) {
+							; e.g. outlook offline
+							warning := WarningUnknown
+						}
 					} else {
 						address := rec.Address
 					}
 						
-					if (not isInternalMail(address))
+					if (address and not isInternalMail(address))
 					{
-						warning := true
+						warning := WarningExternal
 						break
 					}
 				}
 			} catch {
-				warning := false
+				warning := WarningNo
 			}
-		}
-		if (warning) {
-			ShowWarning(ExternalWarning)
-		}
-		else {
-			HideWarning()
+			if (warning == WarningExternal) {
+				ShowWarning(warnTextExternal, outlookWindow)
+				
+			} else if (warning == WarningUnknown) {
+				ShowWarning(warnTextUnknownAddr, outlookWindow)
+			}
+			else {
+				HideWarning()
+			}
 		}
 	}
 	return
@@ -140,8 +165,8 @@ CreateGUI() {
 	WinSet, Transparent, %TransN%
 }
 
-ShowWarning(warning) {
-	WinGetPos, ActWin_X, ActWin_Y, ActWin_W, ActWin_H, A
+ShowWarning(warning, outlookWindow) {
+	WinGetPos, ActWin_X, ActWin_Y, ActWin_W, ActWin_H, ahk_id %outlookWindow%
 	if !ActWin_W
 		throw
 
