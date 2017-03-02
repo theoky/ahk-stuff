@@ -10,6 +10,8 @@
 		  better customisation
 	 v0.2 offline outlook handling, better focus management
 	 v0.3 even more improved outlook handling (distribution lists)
+	 v0.4 better handling of multiple Outlook windows
+	 
   ----------------------------------------------------------
   Purpose:
 	Check an open e-mail-Window for email recipients outside your company,
@@ -102,20 +104,17 @@ WatchForEmail:
 		WinGet, pName, ProcessName, ahk_id %outlookWindow%
 		WinGetClass, outlookWinClass, ahk_id %outlookWindow%
 		
+		warning := WarningNo
+		
 		; ahk_class rctrl_renwnd32 for outlook window (not for dialogs)
 		if (pName == "OUTLOOK.EXE" and outlookWinClass == "rctrl_renwnd32" ) {
 			try {
 				ol := ComObjActive("Outlook.Application")
 				
-				try {
-					rbn := ol.ActiveInspector.CurrentItem.ReceivedByName
-					
-					if (rbn <> "") {
-						; ReceivedByName not empty - received mail, no check
-						return
-					}
-				} catch {
-					warning := WarningNo
+				rbn := ol.ActiveInspector.CurrentItem.ReceivedByName
+				if (rbn <> "") {
+					; ReceivedByName not empty - received mail, no check
+					throw
 				}
 					
 				Loop, % ol.ActiveInspector.CurrentItem.Recipients.Count {
@@ -159,6 +158,7 @@ WatchForEmail:
 			} catch {
 				warning := WarningNo
 			}
+			
 			if (warning == WarningExternal) {
 				ShowWarning(warnTextExternal, outlookWindow)
 				
